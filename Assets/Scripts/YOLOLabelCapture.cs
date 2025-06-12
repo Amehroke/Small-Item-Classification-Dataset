@@ -5,7 +5,6 @@ using System.IO;
 
 public class ClosestEdibleDetector : MonoBehaviour
 {
-    public Camera mainCamera;
     [Range(0f, 0.5f)] public float viewportMargin = 0.05f;
     [Range(0f, 1f)] public float iouThreshold = 0.1f;
     public int imageWidth = 1920;
@@ -24,13 +23,13 @@ public class ClosestEdibleDetector : MonoBehaviour
 
     void Start()
     {
-        if (mainCamera == null)
-            mainCamera = Camera.main;
-
-        FindAndExportClosestEdibles();
+        foreach (Camera cam in Camera.allCameras)
+        {
+            FindAndExportClosestEdibles(cam);
+        }
     }
 
-    void FindAndExportClosestEdibles()
+    void FindAndExportClosestEdibles(Camera cam)
     {
         debugBoxes.Clear();
         debugLabels.Clear();
@@ -45,18 +44,18 @@ public class ClosestEdibleDetector : MonoBehaviour
             string match = edibleKeywords.FirstOrDefault(k => nameLower.Contains(k));
             if (match == null) continue;
 
-            Vector3 viewportPoint = mainCamera.WorldToViewportPoint(renderer.bounds.center);
+            Vector3 viewportPoint = cam.WorldToViewportPoint(renderer.bounds.center);
             if (viewportPoint.z <= 0) continue;
             if (viewportPoint.x < viewportMargin || viewportPoint.x > 1 - viewportMargin) continue;
             if (viewportPoint.y < viewportMargin || viewportPoint.y > 1 - viewportMargin) continue;
 
-            float distance = Vector3.Distance(mainCamera.transform.position, renderer.bounds.center);
+            float distance = Vector3.Distance(cam.transform.position, renderer.bounds.center);
             edibleObjects.Add((go, renderer.bounds, match, distance));
         }
 
         if (edibleObjects.Count == 0)
         {
-            Debug.Log("⚠️ No visible edible objects in camera view.");
+            Debug.Log($"⚠️ No visible edible objects in view of {cam.name}.");
             return;
         }
 
@@ -67,13 +66,12 @@ public class ClosestEdibleDetector : MonoBehaviour
         int accepted = 0;
         int index = 0;
 
-        // First: non-overlapping labels
         while (accepted < numObjectsToDetect && index < sortedObjects.Count)
         {
             var obj = sortedObjects[index];
             index++;
 
-            Rect box = GetViewportRect(obj.bounds);
+            Rect box = GetViewportRect(cam, obj.bounds);
             bool overlaps = savedBoxes.Any(existingBox => ComputeIoU(existingBox, box) > iouThreshold);
             if (overlaps) continue;
 
@@ -81,14 +79,13 @@ public class ClosestEdibleDetector : MonoBehaviour
             accepted++;
         }
 
-        // Second: fill rest with overlapping boxes (avoid exact duplicates)
         int secondPassIndex = 0;
         while (accepted < numObjectsToDetect && secondPassIndex < sortedObjects.Count)
         {
             var obj = sortedObjects[secondPassIndex];
             secondPassIndex++;
 
-            Rect box = GetViewportRect(obj.bounds);
+            Rect box = GetViewportRect(cam, obj.bounds);
             bool isDuplicate = savedBoxes.Any(existingBox => ComputeIoU(existingBox, box) >= 0.99f);
             if (isDuplicate) continue;
 
@@ -96,53 +93,53 @@ public class ClosestEdibleDetector : MonoBehaviour
             accepted++;
         }
 
-        Debug.Log($"🔎 Total objects labeled this frame: {accepted}");
+        Debug.Log($"🔎 [{cam.name}] Labeled objects: {accepted}");
 
         if (labelLines.Count == 0)
         {
-            Debug.Log("⚠️ No labelable objects found.");
+            Debug.Log($"⚠️ No labelable objects for camera {cam.name}");
             return;
         }
 
-        // Save label file and image
         string datasetPath = Path.Combine(Application.dataPath, "Dataset");
         if (!Directory.Exists(datasetPath))
             Directory.CreateDirectory(datasetPath);
 
-        string filename = $"frame_{frameIndex:D4}";
+        string cameraName = cam.name.Replace(" ", "_");
+        string filename = $"frame_{frameIndex:D4}_{cameraName}";
         string labelPath = Path.Combine(datasetPath, filename + ".txt");
         string imagePath = Path.Combine(datasetPath, filename + ".png");
 
         File.WriteAllLines(labelPath, labelLines);
-        Debug.Log($"📄 Saved {labelLines.Count} labels to: {labelPath}");
+        Debug.Log($"📄 [{cam.name}] Labels saved: {labelPath}");
 
         RenderTexture rt = new RenderTexture(imageWidth, imageHeight, 24);
-        mainCamera.targetTexture = rt;
+        cam.targetTexture = rt;
         Texture2D screenShot = new Texture2D(imageWidth, imageHeight, TextureFormat.RGB24, false);
-        mainCamera.Render();
+        cam.Render();
         RenderTexture.active = rt;
         screenShot.ReadPixels(new Rect(0, 0, imageWidth, imageHeight), 0, 0);
-        mainCamera.targetTexture = null;
+        cam.targetTexture = null;
         RenderTexture.active = null;
         Destroy(rt);
         byte[] bytes = screenShot.EncodeToPNG();
         File.WriteAllBytes(imagePath, bytes);
-        Debug.Log($"🖼️ Saved image: {imagePath}");
+        Debug.Log($"🖼️ [{cam.name}] Image saved: {imagePath}");
 
         frameIndex++;
     }
 
-    Rect GetViewportRect(Bounds b)
+    Rect GetViewportRect(Camera cam, Bounds b)
     {
         Vector3[] corners = new Vector3[8];
-        corners[0] = mainCamera.WorldToViewportPoint(b.min);
-        corners[1] = mainCamera.WorldToViewportPoint(new Vector3(b.max.x, b.min.y, b.min.z));
-        corners[2] = mainCamera.WorldToViewportPoint(new Vector3(b.min.x, b.max.y, b.min.z));
-        corners[3] = mainCamera.WorldToViewportPoint(new Vector3(b.min.x, b.min.y, b.max.z));
-        corners[4] = mainCamera.WorldToViewportPoint(new Vector3(b.max.x, b.max.y, b.min.z));
-        corners[5] = mainCamera.WorldToViewportPoint(new Vector3(b.max.x, b.min.y, b.max.z));
-        corners[6] = mainCamera.WorldToViewportPoint(new Vector3(b.min.x, b.max.y, b.max.z));
-        corners[7] = mainCamera.WorldToViewportPoint(b.max);
+        corners[0] = cam.WorldToViewportPoint(b.min);
+        corners[1] = cam.WorldToViewportPoint(new Vector3(b.max.x, b.min.y, b.min.z));
+        corners[2] = cam.WorldToViewportPoint(new Vector3(b.min.x, b.max.y, b.min.z));
+        corners[3] = cam.WorldToViewportPoint(new Vector3(b.min.x, b.min.y, b.max.z));
+        corners[4] = cam.WorldToViewportPoint(new Vector3(b.max.x, b.max.y, b.min.z));
+        corners[5] = cam.WorldToViewportPoint(new Vector3(b.max.x, b.min.y, b.max.z));
+        corners[6] = cam.WorldToViewportPoint(new Vector3(b.min.x, b.max.y, b.max.z));
+        corners[7] = cam.WorldToViewportPoint(b.max);
 
         float minX = corners.Min(v => v.x);
         float maxX = corners.Max(v => v.x);
@@ -164,7 +161,6 @@ public class ClosestEdibleDetector : MonoBehaviour
         labelLines.Add(labelLine);
         savedBoxes.Add(box);
 
-        // Add for visual debugging
         float screenX = box.xMin * imageWidth;
         float screenY = (1f - box.yMax) * imageHeight;
         float screenW = box.width * imageWidth;
