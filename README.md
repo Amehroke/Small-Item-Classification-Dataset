@@ -71,7 +71,7 @@ If you’ve worked with synthetic data or applied AI in retail settings, feel fr
 ## 📬 Contact
 
 **Arashdeep Mehroke**
-Feel free to reach out via [LinkedIn](https://www.linkedin.com/in/arashdeepmehroke) or message me directly for project details or collaboration opportunities.
+Feel free to reach out via [LinkedIn](https://www.linkedin.com/in/arashdeep-singh-020398251/)) or message me directly for project details or collaboration opportunities.
 
 ---
 
