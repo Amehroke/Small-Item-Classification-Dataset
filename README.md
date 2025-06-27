@@ -1,6 +1,3 @@
-Here’s a clean and professional `README.md` for your project:
-
----
 
 # 🛍️ Retail Store Synthetic Dataset Generator
 
