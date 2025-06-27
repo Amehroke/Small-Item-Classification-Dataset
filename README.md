@@ -69,7 +69,3 @@ If you’ve worked with synthetic data or applied AI in retail settings, feel fr
 
 **Arashdeep Mehroke**
 Feel free to reach out via [LinkedIn](https://www.linkedin.com/in/arashdeep-singh-020398251/)) or message me directly for project details or collaboration opportunities.
-
----
-
-Let me know if you want it adapted for GitHub Pages, with demo visuals, dataset links, or model performance charts.
